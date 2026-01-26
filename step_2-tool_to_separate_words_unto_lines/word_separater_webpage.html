@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wort-Separater / Linebreak-Tool</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+    body{margin:0;height:100vh;display:flex;flex-direction:column}
+    header.controls{background:#f3f4f6;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,.05);}
+    .controls-inner{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .controls-inner > *{margin:0}
+    .btn{padding:8px 12px;border-radius:6px;border:1px solid #ccc;background:white;cursor:pointer}
+    .btn-primary{background:#0b79d0;color:white;border-color:#0b79d0}
+    .btn-darkgrey{background:#635a56;color:white;border-color:#625a56}
+    select,input[type=text]{padding:8px;border-radius:6px;border:1px solid #ccc}
+    .main{flex:1;display:flex;gap:8px;padding:8px}
+    textarea{width:100%;height:100%;resize:vertical;padding:12px;font-family:ui-monospace,monospace;font-size:13px;box-sizing:border-box}
+    .pane{flex:1;display:flex;flex-direction:column}
+    .pane > label{font-size:12px;color:#333;margin-bottom:6px}
+    .split{display:flex;gap:8px;height:100%}
+    .filename-controls{display:flex;align-items:center;gap:8px}
+    .radio-row{display:flex;align-items:center;gap:8px}
+    .small{font-size:12px;color:#444}
+    footer{padding:6px 12px;font-size:12px;color:#666;background:#fafafa;border-top:1px solid #eee}
+    @media(max-width:800px){.main{flex-direction:column}.split{flex-direction:column}.controls-inner{flex-direction:column;align-items:stretch}}
+  </style>
+</head>
+<body>
+  <header class="controls">
+    <div class="controls-inner">
+      <!-- File loader -->
+      <button id="loadFileBtn" class="btn btn-darkgrey">Load Textfile</button>
+      <input id="fileInput" type="file" accept="text/*,.txt" style="display:none" />
+
+      <!-- Newline selector -->
+      <label for="newlineSelect" class="small">Linebreak:</label>
+      <select id="newlineSelect">
+        <option value="">-- please select --</option>
+        <option value="windows">Windows-Linebreak (CRLF)</option>
+        <option value="linux">Linux-Linebreak (LF)</option>
+      </select>
+
+      <!-- Separate Words -->
+      <button id="splitBtn" class="btn btn-primary">Separate Words</button>
+
+      <!-- Left conversions -->
+      <button id="lWinToLin" class="btn">(Left) Windows-Linebreaks -> Linux-Linebreaks</button>
+      <button id="lLinToWin" class="btn">(Left) Linux-Linebreaks -> Windows-Linebreaks</button>
+
+      <!-- Right conversions -->
+      <button id="rWinToLin" class="btn">(Right) Windows-Linebreaks -> Linux-Linebreaks</button>
+      <button id="rLinToWin" class="btn">(Right) Linux-Linebreaks -> Windows-Linebreaks</button>
+
+      <!-- Download right -->
+      <button id="downloadBtn" class="btn btn-darkgrey">Download Text (to the right)</button>
+
+      <!-- Filename radio group -->
+      <div style="margin-left:12px">
+        <div class="radio-row">
+          <input type="radio" name="fname" id="fname_opt1" value="opt1" checked />
+          <label for="fname_opt1" class="small">YYYY-MM-DD-hh-mm-separated_terms.txt</label>
+        </div>
+        <div class="radio-row">
+          <input type="radio" name="fname" id="fname_opt2" value="opt2" />
+          <label for="fname_opt2" class="small">YYYY-MM-DD-</label>
+          <input type="text" id="fname_mid" placeholder="userdefined_text" />
+          <span class="small">.txt</span>
+        </div>
+        <div class="radio-row">
+          <input type="radio" name="fname" id="fname_opt3" value="opt3" />
+          <input type="text" id="fname_full" placeholder="whole_filename_without_ending" />
+          <span class="small">.txt</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="split" style="width:100%">
+      <section class="pane">
+        <label for="leftArea">Original Text (left)</label>
+        <textarea id="leftArea" placeholder="Enter Original Text here manually, with click on 'Load Textfile' or paste here with Ctrl + V..."></textarea>
+      </section>
+
+      <section class="pane">
+        <label for="rightArea">Separated Words/Terms (right)</label>
+        <textarea id="rightArea" placeholder="Result appears here..."></textarea>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    Hint: Use the dropdown-field for specifying the linebreaks; if when loading, there hasn't been made a choice, the file will not be loaded.
+  </footer>
+
+<script>
+// Hilfsfunktionen
+function getSelectedNewline(){
+  const sel = document.getElementById('newlineSelect').value;
+  if(sel === 'windows') return '\r\n';
+  if(sel === 'linux') return '\n';
+  return null;
+}
+
+function ensureNewlineSelected(){
+  if(!getSelectedNewline()){
+    alert('Please first select the linebreak in the dropdown-window (Windows or Linux).');
+    return false;
+  }
+  return true;
+}
+
+function normalizeForTextareaDisplay(content){
+  // Textareas display newlines as \n. Convert any CRLF or CR to LF for display.
+  return content.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+}
+
+// File loading
+const fileInput = document.getElementById('fileInput');
+document.getElementById('loadFileBtn').addEventListener('click',()=>{
+  if(!ensureNewlineSelected()) return;
+  fileInput.click();
+});
+
+fileInput.addEventListener('change', async (e)=>{
+  const f = e.target.files[0];
+  if(!f) return;
+  if(!ensureNewlineSelected()) return; // extra safety
+  const text = await f.text();
+  // We will display line breaks in the textarea. Use the selected type to interpret the file's breaks.
+  // For robust behaviour: normalize CRLF->LF for textarea display so breaks show. We DO NOT change file bytes.
+  const displayed = normalizeForTextareaDisplay(text);
+  document.getElementById('leftArea').value = displayed;
+  // reset file input so same file can be reloaded if needed
+  fileInput.value = '';
+});
+
+// Split logic
+function splitTerms(){
+  if(!ensureNewlineSelected()) return;
+  const left = document.getElementById('leftArea').value;
+  const targetNL = getSelectedNewline();
+  // Normalize left to use \n for existing line breaks
+  const normLeft = left.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+
+  // We must replace each space or tab with a SINGLE target newline, and wherever there was an existing newline in left,
+  // put TWO target newlines in the right textarea.
+  let result = '';
+  for(let i=0;i<normLeft.length;i++){
+    const ch = normLeft[i];
+    if(ch === ' ' || ch === '\t'){
+      result += targetNL;
+    } else if(ch === '\n'){
+      // existing break -> two consecutive target newlines
+      result += targetNL + targetNL;
+    } else {
+      result += ch;
+    }
+  }
+  document.getElementById('rightArea').value = result;
+}
+
+document.getElementById('splitBtn').addEventListener('click',splitTerms);
+
+// Conversion helpers (Left)
+document.getElementById('lWinToLin').addEventListener('click',()=>{
+  const v = document.getElementById('leftArea').value;
+  // Convert CRLF -> LF
+  document.getElementById('leftArea').value = v.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+});
+
+document.getElementById('lLinToWin').addEventListener('click',()=>{
+  let v = document.getElementById('leftArea').value;
+  // Normalize then convert LF -> CRLF
+  v = v.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  document.getElementById('leftArea').value = v.replace(/\n/g,'\r\n');
+});
+
+// Conversion helpers (Right)
+document.getElementById('rWinToLin').addEventListener('click',()=>{
+  const v = document.getElementById('rightArea').value;
+  document.getElementById('rightArea').value = v.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+});
+
+document.getElementById('rLinToWin').addEventListener('click',()=>{
+  let v = document.getElementById('rightArea').value;
+  v = v.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  document.getElementById('rightArea').value = v.replace(/\n/g,'\r\n');
+});
+
+// Download right textarea
+function pad2(n){return n.toString().padStart(2,'0');}
+function makeTimestampFilename(){
+  const d = new Date();
+  const YYYY = d.getFullYear();
+  const MM = pad2(d.getMonth()+1);
+  const DD = pad2(d.getDate());
+  const hh = pad2(d.getHours());
+  const mm = pad2(d.getMinutes());
+  return `${YYYY}-${MM}-${DD}-${hh}-${mm}-separated_terms.txt`;
+}
+
+function downloadRight(){
+  const content = document.getElementById('rightArea').value;
+  // Determine newline normalization according to selected radio? The saved file should keep the chosen newline from the dropdown when content was generated,
+  // but the right textarea might currently contain mixed newlines. We'll convert all internal \n to either CRLF or LF depending on newlineSelect.
+  const newline = getSelectedNewline() || '\n';
+  // First normalize textarea to LF, then produce target newlines
+  let normalized = content.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  if(newline === '\r\n') normalized = normalized.replace(/\n/g,'\r\n');
+
+  // filename per radio
+  const opt1 = document.getElementById('fname_opt1').checked;
+  const opt2 = document.getElementById('fname_opt2').checked;
+  const opt3 = document.getElementById('fname_opt3').checked;
+  let filename = '';
+  if(opt1){ filename = makeTimestampFilename(); }
+  else if(opt2){
+    const d = new Date();
+    const YYYY = d.getFullYear();
+    const MM = pad2(d.getMonth()+1);
+    const DD = pad2(d.getDate());
+    const prefix = `${YYYY}-${MM}-${DD}-`;
+    const mid = document.getElementById('fname_mid').value.replace(/[^a-zA-Z0-9_\-]/g,'_') || 'text';
+    filename = prefix + mid + '.txt';
+  } else if(opt3){
+    const full = document.getElementById('fname_full').value.replace(/[^a-zA-Z0-9_\-]/g,'_') || 'filename';
+    filename = full + '.txt';
+  }
+
+  const blob = new Blob([normalized],{type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); },5000);
+}
+
+document.getElementById('downloadBtn').addEventListener('click',()=>{
+  downloadRight();
+});
+
+// Allow Ctrl+V into left textarea naturally; nothing else needed
+
+// Extra: keyboard shortcut: Ctrl+Enter to trigger split
+document.getElementById('leftArea').addEventListener('keydown',(e)=>{
+  if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){
+    e.preventDefault(); splitTerms();
+  }
+});
+
+</script>
+</body>
+</html>

@@ -1,0 +1,192 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Tool for determining display-times – expanded</title>
+  <style>
+    body { font-family: sans-serif; margin: 12px; }
+    #container { display:flex; gap:12px; }
+    #left { flex:1; }
+    #right { width:420px; display:flex; flex-direction:column; }
+    video, audio { max-width:100%; border:1px solid #ccc; }
+    textarea { flex:1; width:100%; height:400px; font-family: monospace; }
+    .controls { margin:6px 0; }
+  </style>
+</head>
+<body>
+  <h2>Tool for determining display-times</h2>
+  <div id="container">
+    <div id="left">
+      <div class="controls">
+        <label>Select Video/Audio: <input id="fileinput" type="file" accept="video/*,audio/*"></label>
+      </div>
+
+      <div class="controls">
+        <label>Maximum Videosize: 
+          <select id="maxSize">
+            <option value="360">360px</option>
+            <option value="480" selected>480px</option>
+            <option value="720">720px</option>
+            <option value="1080">1080px</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="playerwrap">
+        <video id="video" controls style="display:none"></video>
+        <audio id="audio" controls style="display:none"></audio>
+      </div>
+
+      <div class="controls">
+        <button id="playpause">Play/Pause</button>
+        <label style="margin-left:12px">Insert on Enter from:
+          <select id="mode">
+            <option value="video">Video</option>
+            <option value="audio">Audio</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="controls">
+        <strong>Video-Volume:</strong> <span id="volDisplay">100%</span>
+        <button id="volUp">Volume × 1.5</button>
+        <button id="volDown">Volume ÷ 1.5</button>
+      </div>
+
+      <div class="controls">
+        <strong>Audio-Volume:</strong> <span id="volDisplayAudio">100%</span>
+        <button id="volUpAudio">Volume × 1.5</button>
+        <button id="volDownAudio">Volume ÷ 1.5</button>
+      </div>
+
+    </div>
+
+    <div id="right">
+      <label>Timestamps-Editor (Enter adds time):</label>
+      <textarea id="timestamps" placeholder="Timestamps will be added hereto..."></textarea>
+      <div style="margin-top:6px">
+        <button id="download">Download Timestamps</button>
+        <button id="clear">Clear</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const fileinput = document.getElementById('fileinput');
+const video = document.getElementById('video');
+const audio = document.getElementById('audio');
+const playpause = document.getElementById('playpause');
+const timestamps = document.getElementById('timestamps');
+const mode = document.getElementById('mode');
+const download = document.getElementById('download');
+const clearBtn = document.getElementById('clear');
+const maxSize = document.getElementById('maxSize');
+const volDisplay = document.getElementById('volDisplay');
+const volDisplayAudio = document.getElementById('volDisplayAudio');
+let audioCtxVideo = null, gainNodeVideo = null;
+let audioCtxAudio = null, gainNodeAudio = null;
+
+function initGainVideo() {
+  if (!audioCtxVideo) {
+    audioCtxVideo = new AudioContext();
+    const src = audioCtxVideo.createMediaElementSource(video);
+    gainNodeVideo = audioCtxVideo.createGain();
+    gainNodeVideo.gain.value = 1;
+    src.connect(gainNodeVideo);
+    gainNodeVideo.connect(audioCtxVideo.destination);
+  }
+}
+
+function initGainAudio() {
+  if (!audioCtxAudio) {
+    audioCtxAudio = new AudioContext();
+    const src = audioCtxAudio.createMediaElementSource(audio);
+    gainNodeAudio = audioCtxAudio.createGain();
+    gainNodeAudio.gain.value = 1;
+    src.connect(gainNodeAudio);
+    gainNodeAudio.connect(audioCtxAudio.destination);
+  }
+}
+
+function updateVolVideo() {
+  if (gainNodeVideo) volDisplay.textContent = Math.round(gainNodeVideo.gain.value * 100) + '%';
+}
+function updateVolAudio() {
+  if (gainNodeAudio) volDisplayAudio.textContent = Math.round(gainNodeAudio.gain.value * 100) + '%';
+}
+
+document.getElementById('volUp').addEventListener('click', () => { initGainVideo(); gainNodeVideo.gain.value *= 1.5; updateVolVideo(); });
+document.getElementById('volDown').addEventListener('click', () => { initGainVideo(); gainNodeVideo.gain.value /= 1.5; updateVolVideo(); });
+
+document.getElementById('volUpAudio').addEventListener('click', () => { initGainAudio(); gainNodeAudio.gain.value *= 1.5; updateVolAudio(); });
+document.getElementById('volDownAudio').addEventListener('click', () => { initGainAudio(); gainNodeAudio.gain.value /= 1.5; updateVolAudio(); });
+
+maxSize.addEventListener('change', () => {
+  const px = maxSize.value;
+  video.style.maxHeight = px + 'px';
+  video.style.maxWidth = px + 'px';
+});
+
+fileinput.addEventListener('change', (ev) => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+
+  if (file.type.startsWith('video/')) {
+    audio.style.display = 'none';
+    video.style.display = 'block';
+    video.src = url;
+    video.load();
+  } else {
+    video.style.display = 'none';
+    audio.style.display = 'block';
+    audio.src = url;
+    audio.load();
+  }
+});
+
+playpause.addEventListener('click', () => {
+  const pl = (mode.value === 'video') ? video : audio;
+  if (pl.paused) pl.play(); else pl.pause();
+});
+
+function fmt(t) {
+  if (!isFinite(t)) return "00:00:00.000";
+  const hh = Math.floor(t/3600);
+  const mm = Math.floor((t%3600)/60);
+  const ss = Math.floor(t%60);
+  const ms = Math.floor((t - Math.floor(t)) * 1000);
+  return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0')+'.'+String(ms).padStart(3,'0');
+}
+
+timestamps.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const pl = (mode.value === 'video') ? video : audio;
+    const cur = pl.currentTime || 0;
+    const line = fmt(cur);
+    const start = timestamps.selectionStart;
+    const end = timestamps.selectionEnd;
+    const before = timestamps.value.substring(0,start);
+    const after = timestamps.value.substring(end);
+    timestamps.value = before + line + '\n' + after;
+    const pos = (before + line + '\n').length;
+    timestamps.setSelectionRange(pos,pos);
+    timestamps.focus();
+  }
+});
+
+download.addEventListener('click', () => {
+  const blob = new Blob([timestamps.value], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'timestamps.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+clearBtn.addEventListener('click', () => { timestamps.value = ''; });
+</script>
+</body>
+</html>

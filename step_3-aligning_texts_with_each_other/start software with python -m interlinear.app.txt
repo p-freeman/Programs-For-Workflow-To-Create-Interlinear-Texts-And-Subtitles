@@ -1,0 +1,5 @@
+just open a cmd-window on Windows and enter
+
+python -m interlinear.app
+
+once you're in the directory where the folder "interlinear" is located in (Tip: use "cd" to get to that directory)

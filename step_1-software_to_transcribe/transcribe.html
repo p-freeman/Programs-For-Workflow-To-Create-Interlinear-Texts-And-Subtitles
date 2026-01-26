@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Offline Tool for Transcription – Combined</title>
+
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  textarea { width: 100%; height: 100%; font-size: 16px; resize: none;
+             overflow-y: scroll; white-space: pre-wrap; word-wrap: break-word; }
+  button { cursor:pointer; }
+  video { width:100%; background:black; }
+  audio { width:100%; }
+  .controls { margin-bottom: 12px; }
+</style>
+</head>
+
+<body>
+<div style="display:flex; gap:20px; height:90vh;">
+
+<!-- LEFT SIDE -->
+<div style="flex:1; overflow-y:auto;">
+
+<div style="position:sticky; top:0; background:white; padding-bottom:10px; z-index:10; border-bottom:1px solid #ccc;">
+
+<h2>Offline Tool for Transcription (Audio + Video)</h2>
+
+<div class="controls">
+  <label>Choose File (Audio or Video):</label>
+  <input type="file" id="fileInput" accept="audio/*,video/*" />
+</div>
+
+<div class="controls">
+  <label>Rewind-Time at pressing Enter:</label>
+  <select id="rewindSelect">
+    <option value="1">1s</option>
+    <option value="3" selected>3s</option>
+    <option value="5">5s</option>
+    <option value="10">10s</option>
+  </select>
+</div>
+
+<div class="controls">
+  <label>Playback-Speed:</label>
+  <select id="speedSelect">
+    <option value="1" selected>1.0</option>
+    <option value="0.9">0.9</option>
+    <option value="0.8">0.8</option>
+    <option value="0.7">0.7</option>
+    <option value="0.6">0.6</option>
+    <option value="0.5">0.5</option>
+    <option value="0.4">0.4</option>
+    <option value="0.3">0.3</option>
+  </select>
+</div>
+
+<div class="controls">
+  <label>Maximum Videosize:</label>
+  <select id="maxSize">
+    <option value="144">144px</option>
+    <option value="240">240px</option>
+    <option value="360" selected>360px</option>
+    <option value="480">480px</option>
+    <option value="720">720px</option>
+    <option value="1080">1080px</option>
+  </select>
+</div>
+
+<!-- PLAYER AREA -->
+<div id="playerWrap">
+  <video id="videoPlayer" controls style="display:none"></video>
+  <audio id="audioPlayer" controls style="display:none"></audio>
+</div>
+
+<p><strong>Present Timecode:</strong> <span id="timecode">0:00</span></p>
+
+<p style="font-size:14px;">
+<u><strong>Hotkeys:</strong></u><br>
+• <b>Alt + ↑:</b> 5s back <br>
+• <b>Alt + →:</b> 5s forward <br>
+• <b>Enter in Textarea-Field:</b> Rewind according to settings <br>
+• <b>Two Spaces:</b> automatic linebreak (works only if the cursor is currently at the end of the Textarea-Field)<br>
+</p>
+
+<!-- VIDEO VOLUME -->
+<div class="controls">
+  <strong>Video-Volume:</strong>
+  <span id="videoVolumeDisplay">100%</span><br>
+  <button id="videoVolUp">Video × 1.5</button>
+  <button id="videoVolDown">Video ÷ 1.5</button>
+</div>
+
+<!-- AUDIO VOLUME -->
+<div class="controls">
+  <strong>Audio-Volume:</strong>
+  <span id="audioVolumeDisplay">100%</span><br>
+  <button id="audioVolUp">Audio × 1.5</button>
+  <button id="audioVolDown">Audio ÷ 1.5</button>
+</div>
+
+<button id="insertLinebreakBtn">Insert Linebreak</button><br><br>
+
+<button id="exportBtn">Export Transcript as TXT</button><br>
+<label for="txtTitle">Title:</label>
+<input id="txtTitle" placeholder="transkript" />
+
+</div> <!-- sticky end -->
+</div>
+
+<!-- RIGHT SIDE -->
+<div style="flex:1; overflow-y:auto;">
+  <h3>Transcript</h3>
+  <textarea id="transcript"></textarea>
+</div>
+
+</div>
+
+<script>
+// ================================
+// ELEMENTS
+// ================================
+const fileInput   = document.getElementById('fileInput');
+const video       = document.getElementById('videoPlayer');
+const audio       = document.getElementById('audioPlayer');
+const transcript  = document.getElementById('transcript');
+const rewindSel   = document.getElementById('rewindSelect');
+const speedSel    = document.getElementById('speedSelect');
+const maxSize     = document.getElementById('maxSize');
+const timecode    = document.getElementById('timecode');
+const exportBtn   = document.getElementById('exportBtn');
+const txtTitle    = document.getElementById('txtTitle');
+
+// ================================
+// FILE LOADING + PLAYER SWITCHING
+// ================================
+fileInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const url = URL.createObjectURL(file);
+
+  if (file.type.startsWith("video/")) {
+    audio.style.display = "none";
+    video.style.display = "block";
+    video.src = url;
+    video.playbackRate = parseFloat(speedSel.value);
+    video.play();
+  } else {
+    video.style.display = "none";
+    audio.style.display = "block";
+    audio.src = url;
+    audio.playbackRate = parseFloat(speedSel.value);
+    audio.play();
+  }
+});
+
+// ================================
+// ENTER = REWIND
+// ================================
+transcript.addEventListener('keydown', e => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const r = parseInt(rewindSel.value);
+
+    const active = (video.style.display === "block") ? video : audio;
+    active.currentTime = Math.max(0, active.currentTime - r);
+    active.play();
+  }
+});
+
+// ================================
+// TWO SPACES = LINEBREAK
+// ================================
+transcript.addEventListener('input', () => {
+  const v = transcript.value;
+  if (v.endsWith("  ")) {
+    transcript.value = v.slice(0, -2) + "\n";
+  }
+});
+
+// ================================
+// SPEED CHANGE
+// ================================
+speedSel.addEventListener('change', () => {
+  const s = parseFloat(speedSel.value);
+  if (video.style.display === "block") video.playbackRate = s;
+  if (audio.style.display === "block") audio.playbackRate = s;
+});
+
+// ================================
+// TIMECODE DISPLAY
+// ================================
+function updateTC(player) {
+  const t = Math.floor(player.currentTime);
+  const m = Math.floor(t / 60);
+  const s = (t % 60).toString().padStart(2, "0");
+  timecode.textContent = `${m}:${s}`;
+}
+
+video.addEventListener('timeupdate', () => updateTC(video));
+audio.addEventListener('timeupdate', () => updateTC(audio));
+
+// ================================
+// ARROW HOTKEYS
+// ================================
+document.addEventListener('keydown', e => {
+  if (document.activeElement.tagName === "SELECT") return;
+
+  const active = (video.style.display === "block") ? video : audio;
+
+  if (e.altKey && e.key === "ArrowUp") {
+    active.currentTime = Math.max(0, active.currentTime - 5);
+  }
+  if (e.altKey && e.key === "ArrowRight") {
+    active.currentTime = Math.min(active.duration, active.currentTime + 5);
+  }
+});
+
+// ================================
+// EXPORT TRANSCRIPT
+// ================================
+exportBtn.addEventListener('click', () => {
+  const blob = new Blob([transcript.value], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+
+  let filename = txtTitle.value.trim();
+  if (filename === "") filename = "transkript";
+  a.download = filename + ".txt";
+
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ================================
+// INSERT LINEBREAK BUTTON
+// ================================
+document.getElementById('insertLinebreakBtn').addEventListener('click', () => {
+  const el = transcript;
+  const start = el.selectionStart;
+  const end   = el.selectionEnd;
+  el.value = el.value.substring(0, start) + "\n" + el.value.substring(end);
+  el.selectionStart = el.selectionEnd = start + 1;
+  el.focus();
+});
+
+// ================================
+// VIDEO SIZE
+// ================================
+maxSize.addEventListener('change', () => {
+  video.style.maxWidth  = maxSize.value + "px";
+  video.style.maxHeight = maxSize.value + "px";
+});
+
+// ================================
+// AUDIO/VIDEO GAIN (4 BUTTONS)
+// ================================
+let videoCtx=null, videoGain=null;
+let audioCtx=null, audioGain=null;
+
+function initVideoGain() {
+  if (!videoCtx) {
+    videoCtx = new AudioContext();
+    const src = videoCtx.createMediaElementSource(video);
+    videoGain = videoCtx.createGain();
+    videoGain.gain.value = 1;
+    src.connect(videoGain);
+    videoGain.connect(videoCtx.destination);
+  }
+}
+function initAudioGain() {
+  if (!audioCtx) {
+    audioCtx = new AudioContext();
+    const src = audioCtx.createMediaElementSource(audio);
+    audioGain = audioCtx.createGain();
+    audioGain.gain.value = 1;
+    src.connect(audioGain);
+    audioGain.connect(audioCtx.destination);
+  }
+}
+
+const videoVolDisplay = document.getElementById('videoVolumeDisplay');
+const audioVolDisplay = document.getElementById('audioVolumeDisplay');
+
+function updVideoVol() {
+  videoVolDisplay.textContent = Math.round(videoGain.gain.value * 100) + "%";
+}
+function updAudioVol() {
+  audioVolDisplay.textContent = Math.round(audioGain.gain.value * 100) + "%";
+}
+
+// VIDEO volume
+document.getElementById('videoVolUp').addEventListener('click', () => {
+  initVideoGain();
+  videoGain.gain.value *= 1.5;
+  updVideoVol();
+});
+document.getElementById('videoVolDown').addEventListener('click', () => {
+  initVideoGain();
+  videoGain.gain.value /= 1.5;
+  updVideoVol();
+});
+
+// AUDIO volume
+document.getElementById('audioVolUp').addEventListener('click', () => {
+  initAudioGain();
+  audioGain.gain.value *= 1.5;
+  updAudioVol();
+});
+document.getElementById('audioVolDown').addEventListener('click', () => {
+  initAudioGain();
+  audioGain.gain.value /= 1.5;
+  updAudioVol();
+});
+
+</script>
+</body>
+</html>

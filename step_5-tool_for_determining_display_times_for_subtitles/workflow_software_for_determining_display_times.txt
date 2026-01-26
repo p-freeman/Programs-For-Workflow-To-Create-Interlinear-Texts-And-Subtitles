@@ -1,0 +1,11 @@
+Workflow with software for determining display times for subtitles:
+
+1. Open tool_for_determining_display_times_v4-(step_b).html in your browser.
+
+2. Load the video file (or audio file).
+
+3. Play the video and press Enter at the desired times—the times will be written to the textarea-field.
+
+4. Download: Save the timestamps.txt file.
+
+5. timestamps.txt contains one time per line—you can then link this to the group file (from the program "group_words_gui.py").

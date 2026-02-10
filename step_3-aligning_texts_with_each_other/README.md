@@ -53,6 +53,7 @@ The ZIP file can be directly imported into the Interlinear Language Learning App
 
 After copying all files, your folder should look like this:
 
+```bash
 step_3-aligning_texts_with_each_other/
 ├── requirements.txt
 ├── run.sh
@@ -68,3 +69,4 @@ step_3-aligning_texts_with_each_other/
 └── exporter/
    ├── init.py
    └── html_export.py
+```

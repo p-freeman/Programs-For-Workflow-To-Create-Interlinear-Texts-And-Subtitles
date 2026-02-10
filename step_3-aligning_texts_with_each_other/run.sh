@@ -1,6 +1,9 @@
 #!/bin/bash
 # Quick start script for Linux Mint Debian Edition
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 echo "Starting Interlinear Text Creator..."
 echo ""
 
@@ -19,12 +22,17 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Check for required packages
-python3 -c "import qrcode" 2>/dev/null
-if [ $? -ne 0 ]; then
-    echo "Installing required Python packages..."
-    pip3 install -r requirements.txt
+# Create virtual environment if it doesn't exist
+if [ ! -d "venv" ]; then
+    echo "Creating virtual environment..."
+    python3 -m venv venv
 fi
 
+# Activate virtual environment
+source venv/bin/activate
+
+# Install requirements if needed
+pip install -q -r requirements.txt
+
 # Run the application
-python3 -m interlinear.app
+python -m interlinear.app

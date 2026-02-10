@@ -1,32 +1,47 @@
+"""
+Dictionary Module for Interlinear Text Creator
+
+Handles loading, saving, and merging word translation dictionaries.
+"""
+
 import os
 
 def load_dictionary(path):
+    """
+    Load a dictionary file into a dict.
+    
+    Format: one entry per line, "original_word\ttranslation"
+    """
     d = {}
     if not os.path.exists(path):
         return d
-
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
-            parts = line.rstrip("\n").split("\t")
-            d[parts[0]] = list(dict.fromkeys(parts[1:]))
-
+            line = line.strip()
+            if not line or "\t" not in line:
+                continue
+            parts = line.split("\t", 1)
+            if len(parts) == 2:
+                d[parts[0]] = parts[1]
     return d
 
 def save_dictionary(path, d):
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    """
+    Save a dictionary to file.
+    """
+    os.makedirs(os.path.dirname(path) if os.path.dirname(path) else ".", exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        for k, v in d.items():
-            f.write("\t".join([k] + v) + "\n")
+        for k, v in sorted(d.items()):
+            f.write(f"{k}\t{v}\n")
 
-def merge_from_lines(existing, orig_lines, target_lines, delimiter=" // "):
-    d = dict(existing)
-    for i, o in enumerate(orig_lines):
-        key = o.strip()
-        if not key:
-            continue
-        parts = [p.strip() for p in (target_lines[i] if i < len(target_lines) else "").split(delimiter) if p.strip()]
-        d.setdefault(key, [])
-        for p in parts:
-            if p not in d[key]:
-                d[key].append(p)
+def merge_from_lines(existing_dict, orig_lines, trans_lines):
+    """
+    Merge word pairs from aligned lines into existing dictionary.
+    """
+    d = dict(existing_dict)
+    for o, t in zip(orig_lines, trans_lines):
+        o = o.strip()
+        t = t.strip()
+        if o and t:
+            d[o] = t
     return d

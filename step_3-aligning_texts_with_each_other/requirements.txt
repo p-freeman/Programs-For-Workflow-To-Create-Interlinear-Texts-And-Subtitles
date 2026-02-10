@@ -1,1 +1,5 @@
+# Requirements for Interlinear Text Creator
+# Works on Linux Mint Debian Edition and other Linux distributions
+
 qrcode[pil]
+PyYAML

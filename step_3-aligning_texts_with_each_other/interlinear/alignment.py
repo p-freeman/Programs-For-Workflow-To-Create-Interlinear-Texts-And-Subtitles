@@ -1,32 +1,43 @@
-def align_word_for_word(orig_line, trans_line, delimiter=" // "):
-    orig_tokens = orig_line.split()
-    trans_pieces = [p.strip() for p in trans_line.split(delimiter) if p.strip()]
+"""
+Alignment Module for Interlinear Text Creator
 
-    if not orig_tokens:
-        return []
+Handles text alignment operations.
+"""
 
-    if not trans_pieces:
-        return [(o, "") for o in orig_tokens]
+def align_texts(source_lines, target_lines):
+    """
+    Align source and target text lines.
+    Pads shorter list with empty strings.
+    """
+    max_len = max(len(source_lines), len(target_lines))
+    
+    # Pad lists to equal length
+    while len(source_lines) < max_len:
+        source_lines.append("")
+    while len(target_lines) < max_len:
+        target_lines.append("")
+    
+    return source_lines, target_lines
 
-    if len(orig_tokens) == len(trans_pieces):
-        return list(zip(orig_tokens, trans_pieces))
+def count_words(lines):
+    """
+    Count non-empty words in a list of lines.
+    """
+    return sum(1 for line in lines if line.strip())
 
-    if len(trans_pieces) < len(orig_tokens):
-        expanded = []
-        for p in trans_pieces:
-            expanded.extend(p.split())
-        while len(expanded) < len(orig_tokens):
-            expanded.append("")
-        return list(zip(orig_tokens, expanded[:len(orig_tokens)]))
-
-    per = len(trans_pieces) // len(orig_tokens)
-    extra = len(trans_pieces) % len(orig_tokens)
-
-    pairs = []
-    idx = 0
-    for i, o in enumerate(orig_tokens):
-        take = per + (1 if i < extra else 0)
-        pairs.append((o, " ".join(trans_pieces[idx:idx+take])))
-        idx += take
-
-    return pairs
+def count_sentences(lines):
+    """
+    Count sentences (groups separated by empty lines).
+    """
+    count = 0
+    in_sentence = False
+    
+    for line in lines:
+        if line.strip():
+            if not in_sentence:
+                count += 1
+                in_sentence = True
+        else:
+            in_sentence = False
+    
+    return count
